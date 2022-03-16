@@ -18,7 +18,22 @@ def handler(signum, frame):
 signal.signal(signal.SIGINT, handler)
 
 
+def Enum_Devices():
+   audio = pyaudio.PyAudio()
+   info = audio.get_host_api_info_by_index(0)
+   numdevices = info.get('deviceCount')
+#   Mic_Name = "USB Microphone: Audio"
+   Mic_Name = "pulse"
+   Dev_Id = ""
+   for i in range(0, numdevices):
+        if (audio.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
+           print("id(%s):%s"%(i,audio.get_device_info_by_host_api_device_index(0, i).get('name')))
+           if Mic_Name in audio.get_device_info_by_host_api_device_index(0, i).get('name'):
+              Dev_Id = i
+   return(Dev_Id)
+
 def Screenshot():
+   print("Screenshooting..")
    while Stop is False:
       Dtime = (datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
       Screename = "SShot-" + str(Dtime) + ".png"
@@ -28,29 +43,25 @@ def Screenshot():
    print("Screenshot() has stopped")
 
 def Record():
-   Thread(target = Screenshot).start()
 
    Wavname = "Rec-%s.wav"%str(datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
    audio = pyaudio.PyAudio()
    info = audio.get_host_api_info_by_index(0)
-   numdevices = info.get('deviceCount')
    frames = []
-   Mic_Device = ""
-   for i in range(0, numdevices):
-        if (audio.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
-           if "USB Microphone: Audio" in audio.get_device_info_by_host_api_device_index(0, i).get('name'):
-               Mic_Device = i
-               print("Input Device id ", i, " - ", audio.get_device_info_by_host_api_device_index(0, i).get('name'))
-               print("rate=",audio.get_device_info_by_index(i).get('defaultSampleRate'))
-               Mic_Rate = int(audio.get_device_info_by_index(i).get('defaultSampleRate'))
-               break
+   Mic_Device = Enum_Devices()
    if type(Mic_Device) == int:
+       Mic_Rate = int(audio.get_device_info_by_index(Mic_Device).get('defaultSampleRate'))
        stream = audio.open(format=pyaudio.paInt16, channels=1,
                 rate=Mic_Rate, input=True,input_device_index = Mic_Device,
                 frames_per_buffer=512)
+       Thread(target = Screenshot).start()
+       print("Recording ...")
        while Stop is False:
-                frames.append(stream.read(512))
-
+                try:
+                   chunk = stream.read(512)
+                   frames.append(chunk)
+                except Exception as e:
+                   print("Error:",e)
        stream.stop_stream()
        stream.close()
        audio.terminate()
@@ -63,13 +74,9 @@ def Record():
        except Exception as e:
            print("Error:",str(e))
    else:
-      print("Mic not found")
-      for i in range(0, numdevices):
-           if (audio.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
-              print("Input Device id ", i, " - ", audio.get_device_info_by_host_api_device_index(0, i).get('name'))
+      print("\n\nMic not found")
 
    print("Exiting")
    sys.exit()
-
 
 Record()
